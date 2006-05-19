@@ -1,0 +1,40 @@
+Revision history for Linux-Bootloader.
+
+SVN Head
+	t/03_grub.basic.t:
+	- Modified test to work on other people's systems
+	
+	lib/Linux/Bootloader: 
+	- removed get_default() from grub module (uses base class get_default() now)
+	- moved conversion of 'saved' to position into _info() from get_default()
+	- changed private function names to start with _
+	- removed remove() from grub module (uses base class remove() now)
+	- created lookup() in base class, converts title to position
+	- moved info() regex patterns into hash
+	- moved majority of lilo, elilo, yaboot functions to base module
+	- added update-kernel support (experimental)
+
+	lib/Linux/Bootloader/Detect.pm: 
+	- Patch from Kees Cook to cleanup bootloader detection logic
+	- Redid detect_architecture() to allow specifying of 'style'
+	  (none, linux, or gentoo)
+	- Add optional argument to allow specifying which devices to check
+	  for MBR's.
+	- Made the _detect_from_mbr and _detect_from_config routines
+	  public, and renamed them.
+	- Refactored code to simplify it a bit
+
+0.9  Mon May 15 19:00:00 2006
+	- Initial pre-release.
+	- Grub, lilo, yaboot, and elilo config file modification should
+	  work.  Advanced functionality may still be a little incomplete.
+	- A unit test for testing the grub functionality has been created
+	- Linux::Bootloader::Detect can detect the currently installed
+	  bootloader by either looking at which config files are
+	  installed, or at the Master Boot Record (MBR)
+	
+0.0  Tue May  2 15:00:00 2006
+	- original version; created by sdist 1.11
+
+
+
