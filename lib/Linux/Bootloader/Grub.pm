@@ -88,7 +88,7 @@ use base 'Linux::Bootloader';
 
 
 use vars qw( $VERSION );
-our $VERSION = '0.0';
+our $VERSION = '1.1';
 
 
 sub new {
@@ -117,12 +117,12 @@ sub _info {
   my @config=@{$self->{config}};
   @config=grep(!/^#|^\n/, @config);
 
-  my %matches = ( default => '^\s*default\s+(\S+)',
-		  timeout => '^\s*timeout\s+(\S+)',
-		  fallback => '^\s*fallback\s+(\S+)',
+  my %matches = ( default => '^\s*default\s*\=*\s*(\S+)',
+		  timeout => '^\s*timeout\s*\=*\s*(\S+)',
+		  fallback => '^\s*fallback\s*\=*\s*(\S+)',
 		  kernel => '^\s*kernel\s+(\S+)',
-		  root 	=> '^\s*kernel\s+\S+\s+root=(\S+)',
-		  args 	=> '^\s*kernel\s+\S+\s+root=\S+\s+(.*)\n',
+		  root 	=> '^\s*kernel\s+.*\s+root=(\S+)',
+		  args 	=> '^\s*kernel\s+\S+\s+(.*)\n',
 		  boot 	=> '^\s*root\s+(.*)',
 		  initrd => '^\s*initrd\s+(.*)',
 		  savedefault => '^\s*savedefault\s+(.*)',
@@ -138,6 +138,10 @@ sub _info {
       foreach my $key (keys %matches) {
         if ($_ =~ /$matches{$key}/i) {
           $sections[$index]{$key} = $1;
+          if ($key eq 'args') {
+	    $sections[$index]{$key} =~ s/root=\S+\s*//i;
+	    delete $sections[$index]{$key} if ($sections[$index]{$key} !~ /\S/);
+          }
         }
       }
   }
@@ -185,7 +189,7 @@ sub set_default {
   }
 
   foreach my $index (0..$#config) {
-    if ($config[$index] =~ /^\s*default\s+\d+/i) { 
+    if ($config[$index] =~ /^\s*default\s*\=*\s*\d+/i) { 
       $config[$index] = "default $newdefault	# set by $0\n"; 
       last;
     } elsif ($config[$index] =~ /^\s*default\ssaved/i) {

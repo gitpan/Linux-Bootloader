@@ -14,36 +14,41 @@ use Linux::Bootloader::Yaboot;
 my %params;
 
 GetOptions(
-  \%params,
-  "bootloader-probe",      # Prints the bootloader in use on the system
-  "arch-probe",            # Prints the arch of the system
-  "bootloader=s",
-  "config_file=s",
-  "add-kernel=s",
-  "remove-kernel=s",
-  "update-kernel=s",
-  "title=s",
-  "args=s",
-  "remove-args=s",
-  "initrd=s",
-  "root=s",
-  "savedefault=s",
-  "position=s",
-  "info=s",
-  "debug=i",
-  "set-default=s",
-  "make-default",
-  "force",
-  "boot-once",
-  "install",
-  "default",
-  "help",
-  "man",
+           \%params,
+           "bootloader-probe",      # Prints the bootloader in use on the system
+           "arch-probe",            # Prints the arch of the system
+           "bootloader=s",
+           "config_file=s",
+           "add-kernel=s",
+           "remove-kernel=s",
+           "update-kernel=s",
+           "title=s",
+           "args=s",
+           "remove-args=s",
+           "initrd=s",
+           "root=s",
+           "savedefault=s",
+           "position=s",
+           "info=s",
+           "debug=i",
+           "set-default=s",
+           "make-default",
+           "force",
+           "boot-once",
+           "install",
+           "default",
+           "help",
+           "man",
+           "version|V",
            ) or pod2usage(-verbose => 1, -exitstatus => 0);
 
 pod2usage(-verbose => 2, -exitstatus => 0) if ($params{man});
 pod2usage(-verbose => 1, -exitstatus => 0) if ($params{help});
 pod2usage(-verbose => 0, -exitstatus => 0) if ! defined(%params);
+
+if ($params{version}) {
+    print "$0 version 1.1\n";
+}
 
 
 ### Bootloader / Arch Detection ###
@@ -131,7 +136,7 @@ if (defined $params{'add-kernel'}) {
 
 } elsif (defined $params{'boot-once'} && defined $params{'title'}) {
   if ($detected_bootloader eq 'lilo') {
-    $self->boot_once($param{title});
+    $self->boot_once($params{title});
   } elsif ($detected_bootloader eq 'grub') {
     $bootloader->read($params{config_file});
     $bootloader->set_default($params{'title'});

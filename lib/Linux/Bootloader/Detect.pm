@@ -41,7 +41,7 @@ use strict;
 use warnings;
 
 use vars qw( $VERSION );
-our $VERSION = '0.0';
+our $VERSION = '1.1';
 
 =head3 detect_architecture([style])
 
@@ -187,10 +187,18 @@ sub detect_bootloader_from_mbr {
     } elsif (@boot_loader == 1) {
         # Found exactly one
         return pop @boot_loader;
-    } else {
-        # Either none or too many to choose from
-        return undef;
+    } elsif (@boot_loader == 2) {
+        # This is the Lilo/Grub exception
+        # Grub on MBR with previous Lilo install
+        # Are they lilo and grub in that order?
+        if ($boot_loader[0] eq 'lilo' and $boot_loader[1] eq 'grub'){
+            warn "Warning:  Grub appears to be used currently, but Lilo was in pasti.\n";
+            return $boot_loader[1];
+        }
     }
+
+    # Either none or too many to choose from
+    return undef;
 }
 
 1;

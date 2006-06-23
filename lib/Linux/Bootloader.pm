@@ -111,7 +111,7 @@ use strict;
 use warnings;
 
 use vars qw( $VERSION );
-our $VERSION = '0.0';
+our $VERSION = '1.1';
 
 
 sub new {
@@ -164,7 +164,10 @@ sub write {
     if ($? != 0) {
       warn "ERROR:  Cannot backup $config_file.\n"; 
       return undef;
+    } else {
+      print "Backed up config to $config_file.bak.boottool.\n";
     }
+
     open(CONFIG, ">$config_file")
       || warn ("ERROR:  Can't open config file.\n") && return undef;
     print CONFIG join("",@config);
@@ -173,7 +176,6 @@ sub write {
   } else {
     print join("",@config) if $self->debug() > 2;
     warn "WARNING:  You do not have write access to $config_file.\n";
-    #return join("",@config);
     return 1;
   }
 }
@@ -537,10 +539,10 @@ sub print_info {
   }
 
   for my $index ($start..$end) {
-    print "\nindex: $index\n";
+    print "\nindex\t: $index\n";
     $index++;
     foreach (keys(%{$sections[$index]})) {
-      print "$_: $sections[$index]{$_}\n";
+      print "$_\t: $sections[$index]{$_}\n";
     }
   }
 }

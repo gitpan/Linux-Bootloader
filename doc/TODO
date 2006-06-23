@@ -5,8 +5,7 @@
 * (DONE) Create Linux::Bootloader::Lilo
 * (DONE) Create Linux::Bootloader::Elilo
 * (DONE) Create Linux::Bootloader::Yaboot
-
-* Test thoroughly on grub, including boot-once capability
+* (DONE) Test thoroughly on grub, including boot-once capability
 * Test thoroughly on lilo, including boot-once capability
 * Test thoroughly on elilo, except for boot-once capability
 * Test thoroughly on yaboot, except for boot-once capability

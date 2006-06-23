@@ -50,6 +50,12 @@ Also see L<Linux::Bootloader> for functions available from the base class.
 
 	Creates a new Linux::Bootloader::Elilo object.
 
+=head2 install()
+
+        Attempts to install bootloader.
+        Takes: nothing.
+        Returns: undef on error.
+
 =cut
 
 
@@ -62,7 +68,7 @@ use base 'Linux::Bootloader';
 
 
 use vars qw( $VERSION );
-our $VERSION = '0.0';
+our $VERSION = '1.1';
 
 
 sub new {

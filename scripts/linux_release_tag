@@ -3,8 +3,12 @@
 if [ ! -z $1 ]; then
     MAKEFILE=$1
 fi
-
 makefile=${MAKEFILE:-"/usr/src/linux/Makefile"}
+
+if [ ! -z $2 ]; then
+    FORMAT=$2
+fi
+format=${FORMAT:-"%v.%p.%s%e"}
 
 if [ ! -f $makefile ]; then
     if [ -f "$makefile/Makefile" ]; then
@@ -21,5 +25,11 @@ export `egrep "^ *SUBLEVEL *=" $makefile | sed "s/ *//g;"`
 export `egrep "^ *EXTRAVERSION *=" $makefile | sed "s/ *//g;"`
 export `egrep "^ *NAME *=" $makefile | sed "s/ *//g;"`
 
-echo "$VERSION.$PATCHLEVEL.$SUBLEVEL$EXTRAVERSION"
+echo $format \
+    | sed "s/%v/$VERSION/g" \
+    | sed "s/%p/$PATCHLEVEL/g" \
+    | sed "s/%s/$SUBLEVEL/g" \
+    | sed "s/%e/$EXTRAVERSION/g" \
+    | sed "s/%n/$NAME/g" 
+    
 exit 0

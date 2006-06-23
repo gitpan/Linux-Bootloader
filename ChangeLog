@@ -1,12 +1,34 @@
 Revision history for Linux-Bootloader.
 
-SVN Head
+HEAD
+	lib/Linux/Bootloader.pm: 
+	- print message when backing up config file
+	- modified print_info output format
+
+	lib/Linux/Bootloader/Detect.pm
+	- Patch from Judith to identify situation where Grub has been
+	  installed on top of Lilo.
+	
+	lib/Linux/Bootloader/Grub.pm: 
+        - bugfix, loosened global var detection to include '='
+	- fixed bug detecting root on fedora config found by jdaiker
+
+	scripts/boottool: 
+        - fixed typo for lilo boot-once (param -> params)
+
+	scripts/kernel_label: 
+	- check if kernel var is empty before printing
+
+
+1.0  Mon May 18 19:00:00 2006
 	t/03_grub.basic.t:
 	- Modified test to work on other people's systems
 	
 	lib/Linux/Bootloader: 
-	- removed get_default() from grub module (uses base class get_default() now)
-	- moved conversion of 'saved' to position into _info() from get_default()
+	- removed get_default() from grub module (uses base 
+	  class get_default() now)
+	- moved conversion of 'saved' to position into _info() 
+          from get_default()
 	- changed private function names to start with _
 	- removed remove() from grub module (uses base class remove() now)
 	- created lookup() in base class, converts title to position
