@@ -13,6 +13,7 @@ MANIFEST
 META.yml
 README
 scripts/boottool
+scripts/kernel_label
 scripts/linux_install
 scripts/linux_install.pod
 scripts/linux_mkinitrd

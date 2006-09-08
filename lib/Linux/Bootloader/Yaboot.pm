@@ -68,17 +68,17 @@ use base 'Linux::Bootloader';
 
 
 use vars qw( $VERSION );
-our $VERSION = '1.1';
+our $VERSION = '1.2';
 
 
 sub new {
     my $class = shift;
     my $self = bless({}, $class);
 
-    $self->{'config'}   = [];
-    $self->{'debug'}    = 0;
-
     $self->SUPER::new();
+    unless (defined $self->{'config_file'}){
+      $self->{'config_file'}='/etc/yaboot.conf';
+    }
 
     return $self;
 }
@@ -90,13 +90,16 @@ sub new {
 # Run command to install bootloader
 
 sub install {
-  my $self=shift;
+    my $self=shift;
 
-  system("ybin");
-  if ($? != 0) { 
-    warn ("ERROR:  Failed to run ybin.\n") && return undef; 
-  }
-  return 1;
+    #system("/usr/sbin/ybin");
+    #if ( $? != 0 ) {
+    #    warn("ERROR:  Failed to run ybin.\n") && return undef;
+    #}
+
+    print("Not installing bootloader.\n");
+    print("Depending on your arch you may need to run ybin.\n");
+    return 1;
 }
 
 

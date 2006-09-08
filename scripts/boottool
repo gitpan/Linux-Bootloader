@@ -77,72 +77,70 @@ if (defined $params{'bootloader-probe'}) {
 }
 
 
-### Do Config ###
+### Load Module ###
 
 my $bootloader;
 if ($detected_bootloader eq 'grub') {
-  $bootloader = new Linux::Bootloader::Grub;
-  $params{config_file} = '/boot/grub/menu.lst' unless defined $params{config_file}; 
+  $bootloader = new Linux::Bootloader::Grub($params{config_file});
 } elsif ($detected_bootloader eq 'lilo') {
-  $bootloader = new Linux::Bootloader::Lilo;
-  $params{config_file} = '/etc/lilo.conf' unless defined $params{config_file}; 
+  $bootloader = new Linux::Bootloader::Lilo($params{config_file});
 } elsif ($detected_bootloader eq 'elilo') {
-  $bootloader = new Linux::Bootloader::Elilo;
-  $params{config_file} = '/etc/elilo.conf' unless defined $params{config_file}; 
+  $bootloader = new Linux::Bootloader::Elilo($params{config_file});
 } elsif ($detected_bootloader eq 'yaboot') {
-  $bootloader = new Linux::Bootloader::Yaboot;
-  $params{config_file} = '/etc/yaboot.conf' unless defined $params{config_file}; 
+  $bootloader = new Linux::Bootloader::Yaboot($params{config_file});
 } else { 
   die "ERROR: Bootloader $detected_bootloader not recognized!\n";
 }
 
-if (! -r $params{config_file}) { die "Can't read config file.\n"; }
+### Check Config ###
+
+if (! -r $bootloader->{config_file}) { die "Can't read config file.\n"; }
 
 if (defined $params{'debug'}) {
   $bootloader->debug($params{'debug'});
 }
 
 if (defined $params{'add-kernel'}) {
-  $bootloader->read($params{config_file});
+  $bootloader->read();
   $bootloader->add(%params);
-  $bootloader->write($params{config_file});
+  $bootloader->write();
   $bootloader->install() unless $detected_bootloader eq 'grub';
 
 } elsif (defined $params{'remove-kernel'}) {
-  $bootloader->read($params{config_file});
+  $bootloader->read();
   $bootloader->remove($params{'remove-kernel'});
-  $bootloader->write($params{config_file});
+  $bootloader->write();
   $bootloader->install() unless $detected_bootloader eq 'grub';
 
 } elsif (defined $params{'update-kernel'}) {
-  $bootloader->read($params{config_file});
+  $bootloader->read();
   $bootloader->update(%params);
-  $bootloader->write($params{config_file});
+  $bootloader->write();
   $bootloader->install() unless $detected_bootloader eq 'grub';
 
 } elsif (defined $params{info}) {
-  $bootloader->read($params{config_file});
+  $bootloader->read();
   $bootloader->print_info($params{info});
 
 } elsif (defined $params{'set-default'}) {
-  $bootloader->read($params{config_file});
+  $bootloader->read();
   $bootloader->set_default($params{'set-default'});
-  $bootloader->write($params{config_file});
+  $bootloader->write();
   $bootloader->install() unless $detected_bootloader eq 'grub';
 
 } elsif (defined $params{'default'}) {
-  $bootloader->read($params{config_file});
+  $bootloader->read();
   print $bootloader->get_default() . "\n";
 
 } elsif (defined $params{'boot-once'} && defined $params{'title'}) {
-  if ($detected_bootloader eq 'lilo') {
-    $self->boot_once($params{title});
-  } elsif ($detected_bootloader eq 'grub') {
-    $bootloader->read($params{config_file});
-    $bootloader->set_default($params{'title'});
-    $bootloader->write($params{config_file});
+  if ($detected_bootloader =~ /^lilo|^elilo|^grub/) {
+    $bootloader->boot_once($params{title});
   } else {
-    print "$detected_bootloader does not have boot-once support!\n";
+    warn "WARNING: $detected_bootloader does not have boot-once support.\n";
+    warn "Setting as default instead.\n";
+    $bootloader->read();
+    $bootloader->set_default($params{'title'});
+    $bootloader->write();
   } 
 }
 

@@ -74,17 +74,17 @@ use base 'Linux::Bootloader';
 
 
 use vars qw( $VERSION );
-our $VERSION = '1.1';
+our $VERSION = '1.2';
 
 
 sub new {
     my $class = shift;
     my $self = bless({}, $class);
 
-    $self->{'config'}   = [];
-    $self->{'debug'}    = 0;
-
     $self->SUPER::new();
+    unless (defined $self->{'config_file'}){
+      $self->{'config_file'}='/etc/lilo.conf';
+    }
 
     return $self;
 }
@@ -98,7 +98,7 @@ sub new {
 sub install {
   my $self=shift;
 
-  system("lilo");
+  system("/sbin/lilo");
   if ($? != 0) { 
     warn ("ERROR:  Failed to run lilo.\n") && return undef; 
   }
@@ -114,7 +114,7 @@ sub boot_once {
 
   return undef unless defined $label;
   
-  if (system("lilo","-R","$label")) {
+  if (system("/sbin/lilo","-R","$label")) {
     warn ("ERROR:  Failed to set boot-once.\n") && return undef; 
   }
   return 1;

@@ -68,17 +68,17 @@ use base 'Linux::Bootloader';
 
 
 use vars qw( $VERSION );
-our $VERSION = '1.1';
+our $VERSION = '1.2';
 
 
 sub new {
     my $class = shift;
     my $self = bless({}, $class);
 
-    $self->{'config'}   = [];
-    $self->{'debug'}    = 0;
-
     $self->SUPER::new();
+    unless (defined $self->{'config_file'}){
+      $self->{'config_file'}='/etc/elilo.conf';
+    }
 
     return $self;
 }
@@ -92,11 +92,48 @@ sub new {
 sub install {
   my $self=shift;
 
-  system("elilo");
+  system("/usr/sbin/elilo");
   if ($? != 0) { 
     warn ("ERROR:  Failed to run elilo.\n") && return undef; 
   }
   return 1;
+}
+
+# Set kernel to be booted once
+
+sub boot_once {
+    my $self=shift;
+    my $label = shift;
+
+    return undef unless defined $label;
+
+    $self->read( '/etc/elilo.conf' );
+    my @config=@{$self->{config}};
+
+    if ( ! grep( /^checkalt/i, @config ) ) {
+        warn("ERROR:  Failed to set boot-once.\n");
+        warn("Please add 'checkalt' to global config.\n");
+        return undef;
+    }
+
+    my @sections = $self->_info();
+    my $position = $self->_lookup($label);
+    $position++;
+    my $efiroot = `grep ^EFIROOT /usr/sbin/elilo | cut -d '=' -f 2`;
+    chomp($efiroot);
+
+    my $kernel = $efiroot . $sections[$position]{kernel};
+    my $root = $sections[$position]{root};
+    my $args = $sections[$position]{args};
+
+    #system( "/usr/sbin/eliloalt", "-d" );
+    if ( system( "/usr/sbin/eliloalt", "-s", "$kernel root=$root $args" ) ) {
+        warn("ERROR:  Failed to set boot-once.\n");
+        warn("1) Check that EFI var support is compiled into kernel.\n");
+        warn("2) Verify eliloalt works.  You may need to patch it to support sysfs EFI vars.\n");
+        return undef;
+    }
+    return 1;
 }
 
 

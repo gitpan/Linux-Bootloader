@@ -9,10 +9,10 @@ Linux::Bootloader::Grub - Parse and modify GRUB configuration files.
 	use Linux::Bootloader;
 	use Linux::Bootloader::Grub;
 
-	$bootloader = Linux::Bootloader::Grub->new();
         my $config_file='/boot/grub/menu.lst';
+	$bootloader = Linux::Bootloader::Grub->new($config_file);
 
-        $bootloader->read($config_file);
+        $bootloader->read();
 
 	# add a kernel	
 	$bootloader->add(%hash)
@@ -26,7 +26,7 @@ Linux::Bootloader::Grub - Parse and modify GRUB configuration files.
 	# set new default
 	$bootloader->set_default(1)
 
-        $bootloader->write($config_file);
+        $bootloader->write();
 
 
 =head1 DESCRIPTION
@@ -88,7 +88,7 @@ use base 'Linux::Bootloader';
 
 
 use vars qw( $VERSION );
-our $VERSION = '1.1';
+our $VERSION = '1.2';
 
 
 sub new {
@@ -96,10 +96,10 @@ sub new {
     my $self = bless({}, $class);
     #my $self = fields::new($class);
 
-    $self->{'config'}   = [];
-    $self->{'debug'}    = 0;
-
     $self->SUPER::new();
+    unless (defined $self->{'config_file'}){
+      $self->{'config_file'}='/boot/grub/menu.lst';
+    }
 
     return $self;
 }
@@ -121,7 +121,7 @@ sub _info {
 		  timeout => '^\s*timeout\s*\=*\s*(\S+)',
 		  fallback => '^\s*fallback\s*\=*\s*(\S+)',
 		  kernel => '^\s*kernel\s+(\S+)',
-		  root 	=> '^\s*kernel\s+.*\s+root=(\S+)',
+		  root 	=> '^\s*kernel\s+.*\s+.*root=(\S+)',
 		  args 	=> '^\s*kernel\s+\S+\s+(.*)\n',
 		  boot 	=> '^\s*root\s+(.*)',
 		  initrd => '^\s*initrd\s+(.*)',
@@ -178,21 +178,25 @@ sub set_default {
   my @sections=$self->_info();
 
   # if not a number, do title lookup
-  if ($newdefault !~ /^\d+$/) {
+  if ($newdefault !~ /^\d+$/ && $newdefault !~ m/^saved$/) {
     $newdefault = $self->_lookup($newdefault);
+    return undef unless (defined $newdefault);
   }
 
   my $kcount = $#sections-1;
-  if ((!defined $newdefault) || ($newdefault < 0) || ($newdefault > $kcount)) {
-    warn "ERROR:  Enter a default between 0 and $kcount.\n";
-    return undef;
+  if ($newdefault !~ m/saved/) {
+    if (($newdefault < 0) || ($newdefault > $kcount)) {
+      warn "ERROR:  Enter a default between 0 and $kcount.\n";
+      return undef;
+    }
   }
 
   foreach my $index (0..$#config) {
-    if ($config[$index] =~ /^\s*default\s*\=*\s*\d+/i) { 
-      $config[$index] = "default $newdefault	# set by $0\n"; 
+
+    if ($config[$index] =~ /(^\s*default\s*\=*\s*)\d+/i) { 
+      $config[$index] = "$1$newdefault	# set by $0\n"; 
       last;
-    } elsif ($config[$index] =~ /^\s*default\ssaved/i) {
+    } elsif ($config[$index] =~ /^\s*default\s*\=*\s*saved/i) {
       my @default_config;
       my $default_config_file='/boot/grub/default';
 
@@ -200,6 +204,11 @@ sub set_default {
         || warn ("ERROR:  cannot open default file.\n") && return undef;
       @default_config = <DEFAULT_FILE>;
       close(DEFAULT_FILE);
+
+      if ($newdefault eq 'saved') {
+          warn "WARNING:  Setting new default to '0'\n";
+          $newdefault = 0;
+      }
 
       $default_config[0] = "$newdefault\n";
 
@@ -322,18 +331,20 @@ sub update {
 
   print ("Updating kernel.\n") if $self->debug()>1;
 
-  if (!defined $params{'update-kernel'} || (!defined $params{'args'} && !defined $params{'remove-args'})) { 
+  if (defined $params{'option'} && !defined $params{'update-kernel'}) {
+    return $self->update_main_options(%params);
+  } elsif (!defined $params{'update-kernel'} || (!defined $params{'args'} && !defined $params{'remove-args'} && !defined $params{'option'})) { 
     warn "ERROR:  kernel position or title (--update-kernel) and args (--args or --remove-args) required.\n";
     return undef; 
   }
 
   return undef unless $self->_check_config();
 
-  my @config = @{$self->{config}};
+#  my @config = @{$self->{config}};
   my @sections=$self->_info();
 
   # if not a number, do title lookup
-  if ($params{'update-kernel'} !~ /^\d+$/) {
+  if (defined $params{'update-kernel'} and $params{'update-kernel'} !~ /^\d+$/) {
     $params{'update-kernel'} = $self->_lookup($params{'update-kernel'});
   }
 
@@ -344,27 +355,51 @@ sub update {
   }
 
   my $index=-1;
-  foreach (@config) {
-    if ($_ =~ /^\s*title/i) {
+  my $config_line = -1;
+  my $line = '';
+  foreach $line (@{$self->{config}}) {
+    $config_line = $config_line + 1;
+    if ($line =~ /^\s*title/i) {
       $index++;
     }
     if ($index==$params{'update-kernel'}) {
-      if ($_ =~ /(^\s*kernel\s+\S+\s+)(.*)\n/i) {
-        my $kernel = $1;
-        my $args = $2;
-        $args =~ s/\s+$params{'remove-args'}\=*\S*//ig if defined $params{'remove-args'};
-        $args = $args . " ". $params{'args'} if defined $params{'args'};
-        if ($_ eq $kernel . $args . "\n") {
-          warn "WARNING:  No change made to args.\n";
-          return undef;
-        } else {
-          $_ = $kernel . $args . "\n";
+      if (defined $params{'args'} or defined $params{'remove-args'}){
+        if ($line =~ /(^\s*kernel\s+\S+\s+)(.*)\n/i) {
+          my $kernel = $1;
+          my $args = $2;
+          $args =~ s/\s+$params{'remove-args'}\=*\S*//ig if defined $params{'remove-args'};
+          $args = $args . " ". $params{'args'} if defined $params{'args'};
+          if ($line eq $kernel . $args . "\n") {
+            warn "WARNING:  No change made to args.\n";
+            return undef;
+          } else {
+            $line = $kernel . $args . "\n";
+          }
+          next;
         }
-        next;
+      } elsif (defined $params{'option'}){
+        foreach my $val ( keys %params){
+          if ($line =~ m/^\s*$val.*/i) {
+            splice @{$self->{config}},$config_line,1,"$val $params{$val}\n";
+            delete $params{$val};
+            $config_line += 1;
+          }
+        }
       }
+    } elsif ($index > $params{'update-kernel'}){
+      last;
     }
   }
-  @{$self->{config}} = @config;
+  # Add any leftover parameters
+  delete $params{'update-kernel'};
+  if (defined $params{'option'}){
+    delete $params{'option'};
+    $config_line -= 1;
+    foreach my $val ( keys %params){
+      splice @{$self->{config}},$config_line,0,"$val $params{$val}\n";
+      $config_line += 1;
+    }
+  }
 }
 
 
@@ -383,6 +418,97 @@ sub install {
   #  warn ("ERROR:  Failed to run grub-install.\n") && return undef;
   #}
   #return 1;
+}
+
+=head2 FUNCTION update_main_options
+
+This updates or adds a general line anywhere before the first 'title' line.
+it is called with the 'update' and 'option' options, when no 'update-kernel'
+is specified.
+
+=cut
+
+sub update_main_options{
+  my $self=shift;
+  my %params=@_;
+  delete $params{'option'};
+  foreach my $val (keys %params){
+    my $x=0;
+    foreach my $line ( @{$self->{config}} ) {
+      # Replace 
+      if ($line =~ m/^\s*$val/) {
+	splice (@{$self->{config}},$x,1,"$val $params{$val}\n");
+        last;
+      }
+      # Add
+      if ($line =~ /^\s*title/i) {
+        #  This is a new option, add it before here
+        print "Your option is not in current configuration.  Adding.\n";
+	splice @{$self->{config}},$x,0,"$val $params{$val}\n";
+        last;
+      }
+      $x+=1;
+    }
+  }
+}
+
+=head2 FUNCTION boot_once
+
+This is a special case of using 'fallback'.   This function makes the current default the fallback kernel and sets the passed argument to be the default kernel which saves to the fallback kernel after booting.  The file '/boot/grub/default' is created if it does not exist.
+
+This only works with grub versions 0.97 or better.
+
+=cut
+
+sub boot_once {
+  my $self=shift;
+  my $entry_to_boot_once = shift;
+
+  unless ( $entry_to_boot_once ) { print "No kernel\n"; return undef;}
+  $self->read();
+  my $default=$self->get_default();
+
+  if ( $default == $self->_lookup($entry_to_boot_once)){
+     warn "The default and once-boot kernels are the same.  No action taken.  \nSet default to something else, then re-try.\n";
+     return undef;
+  }
+  if ( $self->_get_bootloader_version() < 0.97 ){
+     warn "This function works for grub version 0.97 and up.  No action taken.  \nUpgrade, then re-try.\n";
+     return undef;
+  }
+
+  $self->set_default('saved');
+  if ( ! -f '/boot/grub/default' ){
+     open FH, '>/boot/grub/default'; 
+     my $file_contents="default
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+# WARNING: If you want to edit this file directly, do not remove any line
+# from this file, including this warning. Using `grub-set-default\' is
+# strongly recommended.
+";
+    print FH $file_contents;
+    close FH;
+  }
+  $self->set_default( "$entry_to_boot_once" );
+  $self->update( 'option'=>'','fallback' => $default );
+  $self->update( 'update-kernel'=>"$entry_to_boot_once",'option'=>'','savedefault' => 'fallback' );
+  $self->update( 'update-kernel'=>"$default",'option'=>'', 'savedefault' => '' );
+  $self->write();
+  
+}
+
+sub _get_bootloader_version {
+  my $self = shift;
+  return `grub --version | sed 's/grub (GNU GRUB //' | sed 's/)//'`;
 }
 
 

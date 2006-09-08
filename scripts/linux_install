@@ -50,11 +50,18 @@ for src_file in $files; do
     fi
 done
 
+if echo $arch | grep 86$ >/dev/null; then
+  arch="i386"
+elif echo $arch | grep ppc64$ >/dev/null; then
+  arch="powerpc"
+fi
+echo "Using arch: $arch"
+
 images="arch/$arch/boot/bzImage \
         arch/$arch/boot/vmlinuz \
         arch/$arch/boot/vmlinux \
         arch/$arch/boot/zImage \
-        bzImage vmlinuz vmlinux zImage "
+        bzImage vmlinuz vmlinux.gz vmlinux zImage "
 for image_file in $images; do
     if [ -e $src_dir/$image_file ]; then
         target_file="kernel-$release_tag"

@@ -5,9 +5,10 @@ my %opts = (
             'NAME'          => "Linux::Bootloader",
             'AUTHOR'        => "OSDL Engineering <eng\@osdl.org>",
             'ABSTRACT_FROM' => "lib/Linux/Bootloader.pm",
-            'VERSION'       => '1.1',
+            'VERSION'       => '1.2',
             'EXE_FILES'     => [ qw( 
                                      scripts/boottool
+                                     scripts/kernel_label
                                      scripts/linux_install
                                      scripts/linux_mkinitrd
                                      scripts/linux_release_tag

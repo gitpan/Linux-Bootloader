@@ -228,11 +228,11 @@ sub set_default_grub {
     }
 
     foreach my $index ( 0 .. $#config ) {
-        if ( $config[$index] =~ /^\s*default\s*\=*\s*\d+/i ) {
-            $config[$index] = "default $newdefault	# set by $0\n";
+        if ( $config[$index] =~ /(^\s*default\s*\=*\s*)\d+/i ) {
+            $config[$index] = "$1$newdefault	# set by $0\n";
             last;
         }
-        elsif ( $config[$index] =~ /^\s*default\ssaved/i ) {
+        elsif ( $config[$index] =~ /^\s*default\s*\=*\s*saved/i ) {
             my @default_config;
             my $default_config_file = '/boot/grub/default';
 
@@ -440,7 +440,7 @@ sub install_grub {
 
 sub install_lilo {
 
-    system("lilo");
+    system("/sbin/lilo");
     if ( $? != 0 ) {
         warn("ERROR:  Failed to run lilo.\n") && return undef;
     }
@@ -466,12 +466,49 @@ sub boot_once_lilo {
 
 sub install_elilo {
 
-    system("elilo");
+    system("/usr/sbin/elilo");
     if ( $? != 0 ) {
         warn("ERROR:  Failed to run elilo.\n") && return undef;
     }
     return 1;
 }
+
+# Set kernel to be booted once
+
+sub boot_once_elilo {
+    my $label = shift;
+
+    return undef unless defined $label;
+
+    &read( '/etc/elilo.conf' );
+    my @config = @bootconfig;
+
+    if ( ! grep( /^checkalt/i, @config ) ) {
+        warn("ERROR:  Failed to set boot-once.\n");
+        warn("Please add 'checkalt' to global config.\n");
+	return undef;
+    }
+
+    my @sections = &_info();
+    my $position = &_lookup($label);
+    $position++;
+    my $efiroot = `grep ^EFIROOT /usr/sbin/elilo | cut -d '=' -f 2`;
+    chomp($efiroot);
+
+    my $kernel = $efiroot . $sections[$position]{kernel};
+    my $root = $sections[$position]{root};
+    my $args = $sections[$position]{args};
+
+    #system( "eliloalt", "-d" );
+    if ( system( "eliloalt", "-s", "$kernel root=$root $args" ) ) {
+        warn("ERROR:  Failed to set boot-once.\n");
+        warn("1) Check that EFI var support is compiled into kernel.\n");
+        warn("2) Verify eliloalt works.  You may need to patch it to support sysfs EFI vars.\n");
+	return undef;
+    }
+    return 1;
+}
+
 
 ### YABOOT functions ###
 
@@ -479,10 +516,13 @@ sub install_elilo {
 
 sub install_yaboot {
 
-    system("ybin");
-    if ( $? != 0 ) {
-        warn("ERROR:  Failed to run ybin.\n") && return undef;
-    }
+    #system("/usr/sbin/ybin");
+    #if ( $? != 0 ) {
+    #    warn("ERROR:  Failed to run ybin.\n") && return undef;
+    #}
+
+    print("Not installing bootloader.\n");
+    print("Depending on your arch you may need to run ybin.\n");
     return 1;
 }
 
@@ -553,6 +593,7 @@ sub _info {
         default => '^\s*default[\s+\=]+(\S+)',
         timeout => '^\s*timeout[\s+\=]+(\S+)',
         title   => '^\s*label[\s+\=]+(\S+)',
+        root    => '^\s*root[\s+\=]+(\S+)',
         args    => '^\s*append[\s+\=]+(.*)',
         initrd  => '^\s*initrd[\s+\=]+(\S+)',
     );
@@ -585,6 +626,11 @@ sub _info {
                 last;
             }
         }
+    }
+
+    # if still no valid default, set to first
+    if ( $sections[0]{'default'} !~ m/^\d+$/ ) {
+        $sections[0]{'default'} = 0;
     }
 
     # return array of hashes
@@ -872,7 +918,7 @@ sub remove {
         @bootconfig = @newconfig;
 
         # if we removed the default, set new default to first
-        &set_default(0) if $position == &get_default();
+        &set_default(0) if $position == $sections[0]{'default'};
 
         print "Removed kernel $position.\n";
         return 1;
@@ -1058,14 +1104,14 @@ elsif ( defined $params{'default'} ) {
 elsif ( defined $params{'boot-once'} && defined $params{'title'} ) {
     if ( $detected_bootloader eq 'lilo' ) {
         &boot_once_lilo( $params{title} );
-    }
-    elsif ( $detected_bootloader eq 'grub' ) {
+    } elsif ( $detected_bootloader eq 'elilo' ) {
+        &boot_once_elilo( $params{title} );
+    } else {
+        print "$detected_bootloader does not have boot-once support.\n";
+        print "Setting as default instead.\n";
         &read( $params{config_file} );
         &set_default( $params{'title'} );
         &write( $params{config_file} );
-    }
-    else {
-        print "$detected_bootloader does not have boot-once support!\n";
     }
 }
 

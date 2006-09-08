@@ -41,7 +41,7 @@ use strict;
 use warnings;
 
 use vars qw( $VERSION );
-our $VERSION = '1.1';
+our $VERSION = '1.2';
 
 =head3 detect_architecture([style])
 

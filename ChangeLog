@@ -1,6 +1,26 @@
 Revision history for Linux-Bootloader.
 
-HEAD
+1.2  Fri Sep 8, 2006
+	Bryce:
+	- Updated packaging for 1.2 release
+	- Fix make test issue in add_default() when passed invalid data
+	
+	Judith:
+	- Move the default configuration files into the modules and out of the
+	  boottool script.  Also updated 'boottool' to read and write
+	  calls without passing config file arg.
+	- Tidy up some warnings with debug comparasons, and with Grubs
+	  boot once option.
+	- Initialize params only in parent 'new'.
+
+	JasonN:
+	lib/Linux/Bootloader/Elilo.pm: 
+	- added experimental boot-once support using patched eliloalt 
+	lib/Linux/Bootloader.pm: 
+	- added root parsing back in _info, somehow removed earlier
+	- fixed couple syntax errors from previous commit
+
+1.1  Fri Jun 23 15:44:00 2006
 	lib/Linux/Bootloader.pm: 
 	- print message when backing up config file
 	- modified print_info output format

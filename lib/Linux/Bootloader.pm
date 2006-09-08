@@ -16,6 +16,7 @@ Linux::Bootloader - Base class interacting with Linux bootloaders
 	$bootloader->remove(2);
 	$bootloader->get_default();
 	$bootloader->set_default(2);
+	%hash = $bootloader->read_entry(0);
 	$bootloader->write($config_file);
 
   
@@ -83,6 +84,12 @@ This module provides base functions for working with bootloader configuration fi
 	Takes: string.
 	Returns: undef on error.
 
+=head2 read_entry()
+
+        Read an existing entry into a hash suitable to add or update from.
+	Takes: integer or title
+	Returns: undef or hash
+
 =head2 debug($level)
 
         Sets or gets the current debug level, 0-5.
@@ -107,21 +114,23 @@ This module provides base functions for working with bootloader configuration fi
 
 package Linux::Bootloader;
 
+use Linux::Bootloader::Detect;
 use strict;
 use warnings;
 
 use vars qw( $VERSION );
-our $VERSION = '1.1';
+our $VERSION = '1.2';
 
 
 sub new {
     my $this = shift;
     my $class = ref($this) || $this;
-    #my $self = fields::new($class);
     my $self = bless ({}, $class);
+    $self->{config_file} = shift;
 
     $self->{config}	= [];
     $self->{debug}	= 0;
+    $self->{'entry'}    = {};
 
     return $self;
 }
@@ -133,7 +142,7 @@ sub new {
 
 sub read {
   my $self=shift;
-  my $config_file=shift;
+  my $config_file=shift || $self->{config_file};
   print ("Reading $config_file.\n") if $self->debug()>1;
 
   open(CONFIG, "$config_file")
@@ -151,7 +160,7 @@ sub read {
 
 sub write {
   my $self=shift;
-  my $config_file=shift;
+  my $config_file=shift || $self->{config_file};
   my @config=@{$self->{config}};
 
   return undef unless $self->_check_config();
@@ -194,9 +203,10 @@ sub _info {
 
   my %matches = ( default => '^\s*default[\s+\=]+(\S+)',
                   timeout => '^\s*timeout[\s+\=]+(\S+)',
-                  title  => '^\s*label[\s+\=]+(\S+)',
-                  args  => '^\s*append[\s+\=]+(.*)',
-                  initrd => '^\s*initrd[\s+\=]+(\S+)',
+                  title   => '^\s*label[\s+\=]+(\S+)',
+                  root    => '^\s*root[\s+\=]+(\S+)',
+                  args    => '^\s*append[\s+\=]+(.*)',
+                  initrd  => '^\s*initrd[\s+\=]+(\S+)',
                 );
 
   my @sections;
@@ -228,6 +238,11 @@ sub _info {
     }
   }
 
+  # if still no valid default, set to first
+  if ( $sections[0]{'default'} !~ m/^\d+$/ ) {
+    $sections[0]{'default'} = 0;
+  }
+
   # return array of hashes
   return @sections;
 }
@@ -236,16 +251,17 @@ sub _info {
 # Determine current default kernel
 
 sub get_default {
-  my $self=shift;
+  my $self = shift;
 
   print ("Getting default.\n") if $self->debug()>1;
   return undef unless $self->_check_config();
 
-  my @sections=$self->_info();
-  my $default=$sections[0]{'default'};
+  my @sections = $self->_info();
+  my $default = $sections[0]{'default'};
+  if ($default =~ /^\d+$/) {
+      return 0+$default;
+  }
 
-  $default = 0 + $default;
-  return ($default);
 }
 
 
@@ -295,7 +311,9 @@ sub add {
 
   print ("Adding kernel.\n") if $self->debug()>1;
 
-  if (!defined $param{'add-kernel'} || !defined $param{'title'}) {
+  if (!defined $param{'add-kernel'} && defined $param{'kernel'}) {
+    $param{'add-kernel'} = $param{'kernel'};
+  } elsif (!defined $param{'add-kernel'} || !defined $param{'title'}) {
     warn "ERROR:  kernel path (--add-kernel), title (--title) required.\n";
     return undef;
   } elsif (!(-f "$param{'add-kernel'}")) {
@@ -494,7 +512,7 @@ sub remove {
 
 
     # if we removed the default, set new default to first
-    $self->set_default(0) if $position == $self->get_default();
+    $self->set_default(0) if $position == $sections[0]{'default'};
 
     print "Removed kernel $position.\n";
     return 1;
@@ -555,9 +573,30 @@ sub debug {
   if (@_) {
       $self->{debug} = shift;
   }
-  return $self->{debug};
+  return $self->{debug} || 0;
 }
 
+# Get a bootloader entry as a hash to edit or update.
+sub read_entry {
+  my $self=shift;
+  my $entry=shift;
+
+  if ($entry !~ /^\d+$/) {
+    $entry = $self->_lookup($entry);
+  }
+  my @sections=$self->_info();
+
+  my $index = $entry + 1;
+  if ((defined $sections[$index]{'title'})) {
+    $self->{'entry'}->{'index'} = $index;
+    foreach my $key ( keys %{$sections[$index]} ){
+      $self->{'entry'}->{'data'}->{ $key } = $sections[$index]{$key};
+    }
+    return $self->{'entry'}->{'data'};
+  } else {
+    return undef;
+  }
+}
 
 # Basic check for valid config
 
@@ -579,11 +618,14 @@ sub _check_config {
 sub _lookup {
   my $self=shift;
   my $title=shift;
+  
+  unless ( defined $title ){ return undef; }
 
   my @sections=$self->_info();
 
   for my $index (1..$#sections) {
-    if ((defined $sections[$index]{title}) && ($title eq $sections[$index]{title})) {
+    my $tmp = $sections[$index]{title};
+    if (defined $tmp and $title eq $tmp) {
       return $index-1;
     }
   }
