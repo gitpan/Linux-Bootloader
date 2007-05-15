@@ -1,11 +1,23 @@
 Revision history for Linux-Bootloader.
 
+1.3  Tue May 15, 2007
+	Bryce:
+	- Updated packaging for 1.3 release
+
+	Christian Keck:
+	- Add grub-parameter "module"
+
+        Judith:
+	- Linux::Bootloader::new loads the specific bootloader module.
+        - Update boottool to use it this way.
+
 1.2  Fri Sep 8, 2006
 	Bryce:
 	- Updated packaging for 1.2 release
 	- Fix make test issue in add_default() when passed invalid data
 	
 	Judith:
+	- Add boot-once method for grub.
 	- Move the default configuration files into the modules and out of the
 	  boottool script.  Also updated 'boottool' to read and write
 	  calls without passing config file arg.

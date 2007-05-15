@@ -31,7 +31,6 @@ t/03_grub.basic.out.2
 t/03_grub.basic.out.3
 t/03_grub.basic.out.4
 t/03_grub.basic.out.5
-t/03_grub.basic.out.bak.boottool
 t/03_grub.basic.t
 t/mbr_elilo_00
 t/mbr_grub_00

@@ -125,8 +125,17 @@ our $VERSION = '1.2';
 sub new {
     my $this = shift;
     my $class = ref($this) || $this;
+    if ( defined $class and $class  eq 'Linux::Bootloader' ){
+        my $detected_bootloader = Linux::Bootloader::Detect::detect_bootloader();
+        unless (defined $detected_bootloader) { return undef; }
+        $class = "Linux::Bootloader::" . "\u$detected_bootloader";
+        eval" require $class; ";
+    } 
     my $self = bless ({}, $class);
     $self->{config_file} = shift;
+    unless (defined $self->{'config_file'}){
+        $self->_set_config_file(); 
+    }
 
     $self->{config}	= [];
     $self->{debug}	= 0;
@@ -559,7 +568,7 @@ sub print_info {
   for my $index ($start..$end) {
     print "\nindex\t: $index\n";
     $index++;
-    foreach (keys(%{$sections[$index]})) {
+    foreach ( sort keys(%{$sections[$index]}) ) {
       print "$_\t: $sections[$index]{$_}\n";
     }
   }

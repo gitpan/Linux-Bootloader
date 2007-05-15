@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # variables
-PATH=$PATH:/testing/usr/bin:/sbin:/usr/sbin
+PATH=$PATH:/sbin:/usr/sbin
 
 if [ ! -z $1 ]; then
     RELEASE_TAG=$1

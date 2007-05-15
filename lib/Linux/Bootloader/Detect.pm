@@ -202,8 +202,6 @@ sub detect_bootloader_from_mbr {
 }
 
 1;
-__END__
-
 
 =head1 AUTHOR
 
@@ -221,5 +219,5 @@ under the same terms as Perl itself.
 
 L<Linux::Bootloader>
 
-=end
+=cut
 

@@ -22,6 +22,22 @@ If you want to install the script in your own private space, use
 Note that `make test` does nothing interesting.
 
 
+All-In-One Script Generation
+----------------------------
+You may prefer to use boottool as a single stand-alone script, such as
+including it in another package.
+
+This can be done by simply concatenating all the perl modules together
+with boottool, such as with the following shell command:
+
+cat lib/Linux/Bootloader.pm lib/Linux/Bootloader/*.pm scripts/boottool \
+  | grep -v 'use Linux::Bootloader' \
+  | grep -v "^our $VERSION" \
+  > my_boottool
+
+Then move the '#!/usr/bin/perl' line back up to the top of the file.
+
+
 Uninstallation
 --------------
 

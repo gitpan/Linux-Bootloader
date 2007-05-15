@@ -36,7 +36,7 @@ This module provides functions for working with GRUB configuration files.
 	Adding a kernel:
 	- add kernel at start, end, or any index position.
 	- kernel path and title are required.
-	- root, kernel args, initrd, savedefault are optional.
+	- root, kernel args, initrd, savedefault, module are optional.
 	- any options not specified are copied from default.
 	- remove any conflicting kernels first if force is specified.
 	
@@ -57,25 +57,53 @@ Also see L<Linux::Bootloader> for functions available from the base class.
 
 	Parse config into array of hashes.
 	Takes: nothing.
-	Returns: undef on error.
+	Returns: array of hashes containing config file options and boot entries,
+                 undef on error.
 
 =head2 set_default()
 
 	Set new default kernel.
-	Takes: integer.
+	Takes: integer or string, boot menu position or title.
 	Returns: undef on error.
 
 =head2 add()
 
 	Add new kernel to config.
-	Takes: hash.
+	Takes: hash containing kernel path, title, etc.
 	Returns: undef on error.
 
 =head2 update()
 
         Update args of an existing kernel entry.
-        Takes: hash.
+        Takes: hash containing args and entry to update.
         Returns: undef on error.
+
+=head2 install()
+
+        Prints message on how to re-install grub.
+        Takes: nothing.
+        Returns: nothing.
+
+=head2 update_main_options()
+
+	This updates or adds a general line anywhere before the first 'title' line.
+	it is called with the 'update' and 'option' options, when no 'update-kernel'
+	is specified.
+
+=head2 boot_once()
+
+	This is a special case of using 'fallback'.   This function makes the current 
+	default the fallback kernel and sets the passed argument to be the default 
+	kernel which saves to the fallback kernel after booting.  The file 
+	'/boot/grub/default' is created if it does not exist.
+
+	This only works with grub versions 0.97 or better.
+
+=head2 _get_bootloader_version()
+
+        Prints detected grub version.
+        Takes: nothing.
+        Returns: nothing.
 
 =cut
 
@@ -92,16 +120,19 @@ our $VERSION = '1.2';
 
 
 sub new {
-    my $class = shift;
+    my $this = shift;
+    my $class = ref($this) || $this;
     my $self = bless({}, $class);
     #my $self = fields::new($class);
 
     $self->SUPER::new();
-    unless (defined $self->{'config_file'}){
-      $self->{'config_file'}='/boot/grub/menu.lst';
-    }
 
     return $self;
+}
+
+sub _set_config_file {
+    my $self=shift;
+    $self->{'config_file'}='/boot/grub/menu.lst';
 }
 
 
@@ -126,6 +157,7 @@ sub _info {
 		  boot 	=> '^\s*root\s+(.*)',
 		  initrd => '^\s*initrd\s+(.*)',
 		  savedefault => '^\s*savedefault\s+(.*)',
+		  module      => '^\s*module\s+(.+)',
 		);
 
   my @sections;
@@ -137,6 +169,7 @@ sub _info {
       }
       foreach my $key (keys %matches) {
         if ($_ =~ /$matches{$key}/i) {
+          $key .= '2' if exists $sections[$index]{$key};
           $sections[$index]{$key} = $1;
           if ($key eq 'args') {
 	    $sections[$index]{$key} =~ s/root=\S+\s*//i;
@@ -280,13 +313,31 @@ sub add {
   push(@newkernel, "\troot $param{boot}\n") if defined $param{boot};
 
   my $line;
-  $line = "\tkernel $param{'add-kernel'}" if defined $param{'add-kernel'};
-  $line = $line . " root=$param{root}" if defined $param{root};
-  $line = $line . " $param{args}" if defined $param{args};
-  push(@newkernel, "$line\n");
+  if ( defined $param{xen} ) {
+      $line = "\tkernel $sections[$default]{kernel}";
+      $line .= " $sections[$default]{root}" if defined $sections[$default]{root};
+      $line .= " $sections[$default]{args}" if defined $sections[$default]{args};
+      push( @newkernel, "$line\n" );
+      push( @newkernel, "\tinitrd $sections[$default]{'initrd'}\n" ) if defined $sections[$default]{'initrd'};
+      $line = "\tmodule $param{'add-kernel'}" if defined $param{'add-kernel'};
+      $line .= " root=$param{root}"    if defined $param{root};
+      $line .= " $param{args}"         if defined $param{args};
+      push( @newkernel, "$line\n" );
+      push( @newkernel, "\tmodule $param{initrd}\n" ) if defined $param{initrd};
+  } else {
+      $line = "\tkernel $param{'add-kernel'}" if defined $param{'add-kernel'};
+      $line .= " root=$param{root}"    if defined $param{root};
+      $line .= " $param{args}"         if defined $param{args};
+      push( @newkernel, "$line\n" );
+      push( @newkernel, "\tinitrd $param{initrd}\n" ) if defined $param{initrd};
+  }
 
-  push(@newkernel, "\tinitrd $param{initrd}\n") if defined $param{initrd};
   push(@newkernel, "\tsavedefault $param{savedefault}\n") if defined $param{savedefault};
+
+  foreach my $module (@{$param{'module'}}) {
+     push(@newkernel, "\tmodule " . $module . "\n");
+  }
+
   push(@newkernel, "\n");
 
   if (!defined $param{position} || $param{position} !~ /end|\d+/) { 
@@ -354,6 +405,9 @@ sub update {
     return undef;
   }
 
+  my $kregex = '(^\s*kernel\s+\S+)(.*)';
+  $kregex = '(^\s*module\s+\S+vmlinuz\S+)(.*)' if defined $params{'xen'};
+
   my $index=-1;
   my $config_line = -1;
   my $line = '';
@@ -364,11 +418,16 @@ sub update {
     }
     if ($index==$params{'update-kernel'}) {
       if (defined $params{'args'} or defined $params{'remove-args'}){
-        if ($line =~ /(^\s*kernel\s+\S+\s+)(.*)\n/i) {
+        if ( $line =~ /$kregex/i ) {
           my $kernel = $1;
           my $args = $2;
-          $args =~ s/\s+$params{'remove-args'}\=*\S*//ig if defined $params{'remove-args'};
-          $args = $args . " ". $params{'args'} if defined $params{'args'};
+          $args =~ s/\s+$params{'remove-args'}(\=\S+|\s+|$)/ /ig if defined $params{'remove-args'};
+          if ( defined $params{'args'} ) {
+              my $base_arg = $params{'args'};
+              $base_arg =~ s/\=.*//;
+              $args =~ s/\s+$base_arg(\=\S+|\s+|$)/ /ig;
+              $args = $args . " " . $params{'args'};
+          }
           if ($line eq $kernel . $args . "\n") {
             warn "WARNING:  No change made to args.\n";
             return undef;
@@ -420,13 +479,6 @@ sub install {
   #return 1;
 }
 
-=head2 FUNCTION update_main_options
-
-This updates or adds a general line anywhere before the first 'title' line.
-it is called with the 'update' and 'option' options, when no 'update-kernel'
-is specified.
-
-=cut
 
 sub update_main_options{
   my $self=shift;
@@ -452,13 +504,6 @@ sub update_main_options{
   }
 }
 
-=head2 FUNCTION boot_once
-
-This is a special case of using 'fallback'.   This function makes the current default the fallback kernel and sets the passed argument to be the default kernel which saves to the fallback kernel after booting.  The file '/boot/grub/default' is created if it does not exist.
-
-This only works with grub versions 0.97 or better.
-
-=cut
 
 sub boot_once {
   my $self=shift;
@@ -513,7 +558,6 @@ sub _get_bootloader_version {
 
 
 1;
-__END__
 
 
 =head1 AUTHOR
@@ -532,5 +576,5 @@ under the same terms as Perl itself.
 
 L<Linux::Bootloader>
 
-=end
+=cut
 

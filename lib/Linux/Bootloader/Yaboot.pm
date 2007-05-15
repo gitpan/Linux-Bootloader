@@ -72,17 +72,20 @@ our $VERSION = '1.2';
 
 
 sub new {
-    my $class = shift;
+    my $this = shift;
+    my $class = ref($this) || $this;
     my $self = bless({}, $class);
 
     $self->SUPER::new();
-    unless (defined $self->{'config_file'}){
-      $self->{'config_file'}='/etc/yaboot.conf';
-    }
 
     return $self;
 }
 
+
+sub _set_config_file {
+    my $self=shift;
+    $self->{'config_file'}='/etc/yaboot.conf';
+}
 
 ### YABOOT functions ###
 
@@ -104,7 +107,6 @@ sub install {
 
 
 1;
-__END__
 
 
 =head1 AUTHOR
@@ -123,5 +125,5 @@ under the same terms as Perl itself.
 
 L<Linux::Bootloader>
 
-=end
+=cut
 

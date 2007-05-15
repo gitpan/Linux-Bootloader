@@ -5,7 +5,7 @@ my %opts = (
             'NAME'          => "Linux::Bootloader",
             'AUTHOR'        => "OSDL Engineering <eng\@osdl.org>",
             'ABSTRACT_FROM' => "lib/Linux/Bootloader.pm",
-            'VERSION'       => '1.2',
+            'VERSION'       => '1.3',
             'EXE_FILES'     => [ qw( 
                                      scripts/boottool
                                      scripts/kernel_label
